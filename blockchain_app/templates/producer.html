@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Thêm sự kiện{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0 text-gray-800">Thêm Sự Kiện Vào Chuỗi</h1>
+</div>
+
+<div class="row g-4">
+  <!-- Cột chính (7/12) -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header-navy p-3 ps-4">
+        <i class="bi bi-box-seam me-2"></i>Thông Tin Sản Phẩm & Giai Đoạn
+      </div>
+      <div class="card-body p-4">
+
+        <!-- 1. FORM TÌM KIẾM -->
+        <form method="GET" class="d-flex gap-2 border-bottom pb-4 mb-4">
+          <input type="text" id="product-id-search" name="product_id" class="form-control" placeholder="Nhập Product ID để cập nhật, hoặc để trống để tạo mới..." value="{{ request.args.get('product_id', '') }}">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-search"></i> Tìm
+          </button>
+        </form>
+
+        <!-- 2. FORM THÊM BLOCK -->
+        <form method="POST" action="{{ url_for('producer') }}">
+          <!-- Product ID sẽ được thêm vào đây bằng JS nếu đang cập nhật -->
+          <div id="product-id-form-container"></div>
+
+          <!-- Hiển thị thông tin sản phẩm đã có (nếu có) -->
+          {% if product_info %}
+          <div id="existing-product-info" class="mb-4">
+            <h6 class="fw-bold">Thông tin sản phẩm hiện tại: <code>{{ product_info.product_id }}</code></h6>
+            <div class="row g-2">
+              {% for key, value in product_info.items() %}
+                {% if key != 'product_id' %}
+                <div class="col-md-6">
+                  <div class="form-control bg-light">
+                    <small class="text-muted text-capitalize">{{ key.replace('_', ' ') }}</small>
+                    <div class="fw-semibold">{{ value }}</div>
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Chọn giai đoạn -->
+          <div class="mb-3">
+            <label for="stage-select" class="form-label fw-semibold">
+              {% if product_info %}Chọn giai đoạn để cập nhật thông tin:{% else %}Chọn giai đoạn để tạo sản phẩm mới:{% endif %}
+            </label>
+            <select id="stage-select" name="event" class="form-select">
+              <option value="">-- Vui lòng chọn một giai đoạn --</option>
+              <!-- JS sẽ điền các giai đoạn vào đây -->
+            </select>
+          </div>
+
+          <!-- Các trường thông tin động -->
+          <div id="dynamic-fields-container" class="mt-4">
+            <!-- JS sẽ render các trường nhập liệu vào đây -->
+          </div>
+
+          <!-- Nút submit -->
+          <button id="submit-button" type="submit" class="btn btn-dark px-4 mt-3" style="display: none;">
+            <i class="bi bi-plus-lg me-2"></i> Thêm Block vào chuỗi
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Cột phụ (5/12) -->
+  <div class="col-lg-5">
+    {% include 'includes/result_card.html' %}
+    {% include 'includes/permissions_guide.html' %}
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // ===================================================================
+  // CÁC BIẾN VÀ HẰNG SỐ
+  // ===================================================================
+  const stageSelect = document.getElementById('stage-select');
+  const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
+  const submitButton = document.getElementById('submit-button');
+  const productIdSearchInput = document.getElementById('product-id-search');
+  const productIdFormContainer = document.getElementById('product-id-form-container');
+
+  const currentUserRole = "{{ sub_role }}";
+  const productInfo = {{ product_info | tojson }}; // Dữ liệu sản phẩm từ server
+  const isProductFound = productInfo && Object.keys(productInfo).length > 0;
+
+  const ALL_STAGES = {
+    "Trồng & Thu hoạch": {
+      roles: ["producer"],
+      fields: [
+        { name: "product_name", label: "Tên sản phẩm", required: true, placeholder: "VD: Cà phê Robusta" },
+        { name: "harvest_date", label: "Ngày thu hoạch", type: "date", required: true },
+        { name: "farm_location", label: "Địa điểm nông trại", required: true, placeholder: "VD: Bảo Lộc, Lâm Đồng" }
+      ]
+    },
+    "Đóng gói & Kiểm định": {
+      roles: ["producer"],
+      fields: [
+        { name: "packaging_date", label: "Ngày đóng gói", type: "date", required: true },
+        { name: "quality_certificate", label: "Chứng nhận chất lượng", required: true, placeholder: "VD: VietGAP, GlobalGAP" }
+      ]
+    },
+    "Vận chuyển": {
+      roles: ["transporter"],
+      fields: [
+        { name: "transporter_name", label: "Tên nhà vận chuyển", required: true },
+        { name: "shipping_date", label: "Ngày gửi hàng", type: "date", required: true },
+        { name: "estimated_arrival", label: "Ngày dự kiến đến", type: "date", required: true }
+      ]
+    },
+    "Phân phối": {
+      roles: ["retailer"],
+      fields: [
+        { name: "distributor_name", label: "Tên nhà phân phối", required: true },
+        { name: "arrival_date", label: "Ngày hàng đến", type: "date", required: true }
+      ]
+    },
+    "Bán lẻ": {
+      roles: ["retailer"],
+      fields: [
+        { name: "shelf_date", label: "Ngày lên kệ", type: "date", required: true },
+        { name: "store_location", label: "Địa điểm bán", required: true, placeholder: "VD: Siêu thị ABC, 123 Đường XYZ" }
+      ]
+    }
+  };
+
+  // ===================================================================
+  // CÁC HÀM TIỆN ÍCH
+  // ===================================================================
+  /**
+   * Tạo HTML cho các trường nhập liệu dựa trên cấu hình.
+   * @param {Array} fields - Mảng các đối tượng cấu hình trường.
+   * @returns {string} - Chuỗi HTML.
+   */
+  function generateFieldsHtml(fields) {
+    let html = '<div class="row g-3">';
+    let hasFieldsToRender = false;
+
+    fields.forEach(field => {
+      hasFieldsToRender = true;
+      const requiredStar = field.required ? ' <span class="text-danger">*</span>' : '';
+      const requiredAttr = field.required ? 'required' : '';
+
+      html += `<div class="col-md-6 mb-2">
+                 <label for="${field.name}" class="form-label fw-semibold">${field.label}${requiredStar}</label>`;
+
+      if (field.type === 'select') {
+        html += `<select name="${field.name}" id="${field.name}" class="form-select" ${requiredAttr}>`;
+        field.options.forEach(opt => { html += `<option value="${opt}">${opt}</option>`; });
+        html += `</select>`;
+      } else {
+        html += `<input type="${field.type || 'text'}" name="${field.name}" id="${field.name}"
+                        class="form-control" placeholder="${field.placeholder || ''}" ${requiredAttr}>`;
+      }
+      html += `</div>`;
+    });
+
+    html += '</div>';
+    return hasFieldsToRender ? html : '';
+  }
+
+  /**
+   * Điền các tùy chọn giai đoạn vào dropdown dựa trên vai trò và trạng thái sản phẩm.
+   */
+  function populateStageOptions() {
+    stageSelect.innerHTML = '<option value="">-- Vui lòng chọn một giai đoạn --</option>';
+
+    if (isProductFound) {
+      // CẬP NHẬT SẢN PHẨM: Chỉ hiển thị các giai đoạn chưa làm và được phép
+      const addedFields = Object.keys(productInfo);
+      Object.keys(ALL_STAGES).forEach(stageName => {
+        const stage = ALL_STAGES[stageName];
+        const isRoleAllowed = stage.roles.includes(currentUserRole);
+        // Kiểm tra xem có trường nào của giai đoạn này đã tồn tại trong productInfo không
+        const isStageAdded = stage.fields.some(field => addedFields.includes(field.name));
+
+        if (isRoleAllowed && !isStageAdded) {
+          stageSelect.options.add(new Option(stageName, stageName));
+        }
+      });
+    } else {
+      // TẠO SẢN PHẨM MỚI: Chỉ cho phép "Nhà sản xuất" chọn "Giai đoạn 1"
+      if (currentUserRole === 'producer') {
+        const firstStageName = "Trồng & Thu hoạch";
+        stageSelect.options.add(new Option(firstStageName, firstStageName));
+      } else {
+        stageSelect.disabled = true;
+        stageSelect.innerHTML = '<option value="">-- Cần tìm sản phẩm hoặc bạn không có quyền tạo mới --</option>';
+      }
+    }
+  }
+
+  // ===================================================================
+  // LOGIC KHỞI TẠO VÀ SỰ KIỆN
+  // ===================================================================
+
+  // 1. Điền các tùy chọn giai đoạn khi trang tải xong
+  populateStageOptions();
+
+  // 2. Xử lý sự kiện khi người dùng chọn một giai đoạn từ dropdown
+  stageSelect.addEventListener('change', function() {
+    const selectedStageName = this.value;
+    dynamicFieldsContainer.innerHTML = ""; // Xóa các trường cũ
+    submitButton.style.display = 'none';   // Ẩn nút submit
+
+    if (selectedStageName && ALL_STAGES[selectedStageName]) {
+      const fields = ALL_STAGES[selectedStageName].fields;
+      dynamicFieldsContainer.innerHTML = generateFieldsHtml(fields);
+      submitButton.style.display = 'block';
+
+      // Nếu đang cập nhật, thêm product_id vào form
+      if (isProductFound) {
+        productIdFormContainer.innerHTML = `<input type="hidden" name="product_id" value="${productInfo.product_id}">`;
+      } else {
+        productIdFormContainer.innerHTML = "";
+      }
+    }
+  });
+
+  // 3. Nếu đang tạo mới, tự động kích hoạt sự kiện change cho Giai đoạn 1
+  if (!isProductFound && currentUserRole === 'producer') {
+      stageSelect.value = "Trồng & Thu hoạch";
+      stageSelect.dispatchEvent(new Event('change'));
+  }
+});
+</script>
+
+<!-- ================================================================== -->
+<!--  DANH SÁCH SẢN PHẨM ĐÃ TẠO (CHỈ DÀNH CHO NHÀ SẢN XUẤT)          -->
+<!-- ================================================================== -->
+{% if sub_role == 'producer' and user_products %}
+<div class="row mt-5">
+    <div class="col-lg-10 offset-lg-1">
+        <hr>
+        <h3 class="mb-4 text-center">📋 Danh sách sản phẩm đã tạo</h3>
+        <div class="row">
+            {% for product in user_products %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 text-center shadow-sm">
+                    <div class="card-header bg-light fw-bold">
+                        {{ product.product_id }}
+                    </div>
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                        <h5 class="card-title">{{ product.product_name }}</h5>
+                        <a href="{{ url_for('trace', product_id=product.product_id) }}" target="_blank">
+                            <img src="data:image/png;base64,{{ product.qr_code }}" alt="QR Code for {{ product.product_id }}" class="img-fluid my-2" style="max-width: 150px;">
+                        </a>
+                        <p class="text-muted small mb-0">Quét mã để xem chi tiết</p>
+                    </div>
+                    <div class="card-footer">
+                        <a href="{{ url_for('producer', product_id=product.product_id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-plus-circle me-1"></i> Thêm sự kiện
+                        </a>
+                        <a href="{{ url_for('trace', product_id=product.product_id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                           <i class="bi bi-diagram-3 me-1"></i> Xem chuỗi
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

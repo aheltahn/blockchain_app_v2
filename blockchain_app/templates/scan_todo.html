@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Quét QR — Chưa triển khai{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <div class="card" style="border: 3px dashed #fd7e14;">
+      <div class="card-body text-center p-5">
+        <div style="font-size:4rem;">📷</div>
+        <h4 class="fw-bold mt-3" style="color:#fd7e14;">Tính năng Quét QR — Chưa triển khai</h4>
+
+        <div class="qr-todo text-start mt-4 mb-4">
+          <p class="fw-bold mb-2">⚠️  Tại sao chưa làm?</p>
+          <p class="mb-1">Trình duyệt chỉ cho phép truy cập <strong>camera</strong> khi trang chạy trên <strong>HTTPS</strong>.</p>
+          <p class="mb-0">Localhost (http) không được phép → html5-qrcode sẽ bị chặn ngay.</p>
+        </div>
+
+        <div class="text-start">
+          <p class="fw-bold mb-2">📋  Bước tiếp theo để hoàn thiện:</p>
+          <ol class="small">
+            <li class="mb-2">Deploy lên <strong>Render.com</strong> (có HTTPS miễn phí) hoặc dùng <strong>ngrok</strong> để tunnel localhost ra HTTPS.</li>
+            <li class="mb-2">Thêm thư viện <code>html5-qrcode</code> vào <code>templates/scan.html</code>.</li>
+            <li class="mb-2">Dùng <code>Html5QrcodeScanner</code> để scan — khi scan xong, redirect đến <code>/trace?product_id=xxx</code>.</li>
+            <li class="mb-2">Đổi hàm <code>make_qr_base64()</code> trong <code>app.py</code> để encode <strong>URL đầy đủ</strong> thay vì chỉ text ID.</li>
+          </ol>
+        </div>
+
+        <p class="text-muted small mt-3">Hiện tại hãy dùng trang <strong>Tra cứu</strong> và nhập tay Product ID.</p>
+        <a href="{{ url_for('trace') }}" class="btn mt-2" style="background:#2E75B6;color:#fff;">
+          <i class="bi bi-search me-2"></i>Đến trang Tra cứu (nhập tay)
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
