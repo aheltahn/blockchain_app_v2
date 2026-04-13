@@ -1,10 +1,16 @@
 import hashlib
 import json
-import threading
 from datetime import datetime
+from pymongo import MongoClient, ASCENDING
+import os
 
-# ─── Lock toàn cục để tránh ghi đè khi nhiều request đồng thời ───
-_lock = threading.Lock()
+# --- Cấu hình MongoDB ---
+# !!! QUAN TRỌNG: Hãy dán chuỗi kết nối HOÀN CHỈNH của bạn vào đây
+# Thay thế mycluster.xxxxx.mongodb.net bằng cụm cluster của bạn từ trang web MongoDB Atlas
+MONGO_URI = "mongodb+srv://tranthimyhoa3125_db_user:Admin123@mycluster.22hhxtr.mongodb.net/?appName=MyCluster"
+DB_NAME = "blockchain_db"
+COLLECTION_NAME = "chain"
+# -------------------------
 
 
 class Block:
@@ -51,13 +57,46 @@ class Block:
 
 
 class Blockchain:
-    CHAIN_FILE = "chain.json"
-
     def __init__(self):
+        self.client = None
+        self.db = None
+        self.collection = None
         self.chain = []
-        self._load_chain()
+        self._init_db_connection()
+        self._load_chain_from_db()
         if not self.chain:
             self._create_genesis_block()
+
+    def _init_db_connection(self):
+        """Khởi tạo kết nối đến MongoDB và lấy collection."""
+        try:
+            self.client = MongoClient(MONGO_URI)
+            self.db = self.client[DB_NAME]
+            self.collection = self.db[COLLECTION_NAME]
+            self.collection.create_index([("index", ASCENDING)], unique=True)
+            print("✅ Kết nối MongoDB thành công.")
+        except Exception as e:
+            print(f"❌ Lỗi kết nối MongoDB: {e}")
+            raise
+
+    def _load_chain_from_db(self):
+        """Tải toàn bộ chain từ database và sắp xếp theo index."""
+        try:
+            chain_data = list(self.collection.find().sort("index", ASCENDING))
+            self.chain = [
+                Block(
+                    index=b["index"],
+                    timestamp=b["timestamp"],
+                    data=b["data"],
+                    previous_hash=b["previous_hash"],
+                    nonce=b.get("nonce", 0),
+                )
+                for b in chain_data
+            ]
+            print(f"📚 Đã tải {len(self.chain)} block từ database.")
+        except Exception as e:
+            print(f"❌ Lỗi khi tải chain từ DB: {e}")
+            self.chain = []
 
     # ── Genesis block ─────────────────────────────────────────────
     def _create_genesis_block(self):
@@ -74,7 +113,7 @@ class Blockchain:
             previous_hash="0" * 64,
         )
         self.chain.append(genesis)
-        self._save_chain()
+        self.collection.insert_one(genesis.to_dict())
 
     # ── Thêm block mới ────────────────────────────────────────────
     def add_block(self, data: dict):
@@ -90,11 +129,9 @@ class Blockchain:
         if not product_id:
             raise ValueError("Product ID là bắt buộc.")
 
-        # Nếu không phải giai đoạn 1, sản phẩm phải tồn tại
         if not is_first_stage:
             if not self.get_trace(product_id):
                 raise ValueError(f"Product ID '{product_id}' chưa tồn tại trong chain.")
-        # Nếu là giai đoạn 1, sản phẩm không được tồn tại
         else:
             if self.get_trace(product_id):
                 raise ValueError(f"Product ID '{product_id}' đã tồn tại.")
@@ -106,7 +143,7 @@ class Blockchain:
             previous_hash=self.chain[-1].hash,
         )
         self.chain.append(new_block)
-        self._save_chain()
+        self.collection.insert_one(new_block.to_dict())
         return new_block
 
     # ── Tra cứu theo product_id, event, actor ───────────────────
@@ -148,46 +185,34 @@ class Blockchain:
     # ── Tamper (chỉ dùng để demo) ─────────────────────────────────
     def tamper_block(self, index: int, field: str, value: str):
         """
-        Sửa thẳng 1 field của block mà KHÔNG tính lại hash.
+        Sửa thẳng 1 field của block trong DB mà KHÔNG tính lại hash.
         → is_valid() sẽ trả về False ngay sau đó.
         Chỉ dùng cho mục đích demo tính bất biến.
         """
-        if index <= 0 or index >= len(self.chain):
+        if index <= 0:
             raise ValueError("Index không hợp lệ để tamper.")
-        if hasattr(self.chain[index], field):
-            setattr(self.chain[index], field, value)
-            self._save_chain()
+
+        if field in ["index", "timestamp", "data", "nonce", "previous_hash"]:
+            result = self.collection.update_one({"index": index}, {"$set": {field: value}})
+            if result.matched_count == 0:
+                raise ValueError(f"Block với index {index} không tồn tại.")
+            self._load_chain_from_db()
         else:
             raise ValueError(f"Field '{field}' không tồn tại trong Block.")
 
-    # ── Reset tamper: load lại từ file ────────────────────────────
+    # ── Reset tamper: load lại từ DB ────────────────────────────
     def reset(self):
-        self._load_chain()
+        """Tải lại chain từ DB để hoàn tác các thay đổi trong bộ nhớ."""
+        self._load_chain_from_db()
 
     # ── Lấy tất cả blocks ────────────────────────────────────────
     def get_all_blocks(self):
         return self.chain
 
-    # ── Lưu / Load chain.json ─────────────────────────────────────
-    def _save_chain(self):
-        with _lock:
-            with open(self.CHAIN_FILE, "w", encoding="utf-8") as f:
-                json.dump([b.to_dict() for b in self.chain], f,
-                          ensure_ascii=False, indent=2)
-
-    def _load_chain(self):
-        try:
-            with open(self.CHAIN_FILE, "r", encoding="utf-8") as f:
-                chain_data = json.load(f)
-            self.chain = [
-                Block(
-                    index=b["index"],
-                    timestamp=b["timestamp"],
-                    data=b["data"],
-                    previous_hash=b["previous_hash"],
-                    nonce=b.get("nonce", 0),
-                )
-                for b in chain_data
-            ]
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.chain = []
+    # ── Reset toàn bộ DB ────────────────────────────────────────
+    def reset_chain_in_db(self):
+        """Xóa tất cả các block trong DB và tạo lại genesis block."""
+        print("🔥 Đang xóa tất cả block trong database...")
+        self.collection.delete_many({})
+        self.chain = []
+        self._create_genesis_block()

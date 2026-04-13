@@ -8,7 +8,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = "blockchain_doAn_2026_secret"
 
-# ── Khởi tạo blockchain (singleton) ──────────────────────────────
+# ── Khởi tạo blockchain (kết nối MongoDB) ───────────────────────
 bc = Blockchain()
 
 # ── Tài khoản hardcode ────────────────────────────────────────────
@@ -275,18 +275,18 @@ def tamper():
 @app.route("/admin/reset_chain", methods=["POST"])
 @login_required(role="admin")
 def reset_chain():
-    """Xóa chain.json và tạo lại genesis block — dùng khi muốn demo từ đầu."""
-    import os
-    # Lấy đường dẫn tuyệt đối đến tệp chain.json
-    chain_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chain.json')
-    if os.path.exists(chain_file_path):
-        os.remove(chain_file_path)
-    
-    # Khởi tạo lại đối tượng blockchain để tạo genesis block mới
+    """Xóa chain trong database và tạo lại genesis block — dùng khi muốn demo từ đầu."""
     global bc
-    bc = Blockchain() 
-    
-    flash("🔄 Đã reset chain về genesis block và xóa tệp chain.json cũ.", "info")
+    try:
+        # Gọi hàm reset mới trong lớp Blockchain để xóa collection trong DB
+        bc.reset_chain_in_db()
+
+        # Khởi tạo lại đối tượng blockchain để nạp lại genesis block mới vào bộ nhớ
+        bc = Blockchain()
+
+        flash("✅ Đã reset chain trong database về genesis block.", "success")
+    except Exception as e:
+        flash(f"❌ Có lỗi xảy ra khi reset chain: {e}", "danger")
     return redirect(url_for("admin"))
 
 
@@ -299,13 +299,13 @@ def scan():
     """
     ███████████████████████████████████████████████████████████████
     ██                                                           ██
-    ██   TÍNH NĂNG QUÉT MÃ QR — CHƯA TRIỂN KHAI                ██
+    ██   TÍNH NĂNG QUÉT MÃ QR — CHƯA TRIỂN KHAI                  ██
     ██                                                           ██
-    ██   Cần HTTPS để trình duyệt cho phép truy cập camera.     ██
+    ██   Cần HTTPS để trình duyệt cho phép truy cập camera.      ██
     ██   Bước tiếp theo sau khi deploy lên Render.com:           ██
     ██                                                           ██
-    ██   1. Thêm html5-qrcode vào templates/scan.html           ██
-    ██   2. Dùng Html5QrcodeScanner để scan QR                  ██
+    ██   1. Thêm html5-qrcode vào templates/scan.html            ██
+    ██   2. Dùng Html5QrcodeScanner để scan QR                   ██
     ██   3. Khi scan xong, redirect đến /trace?product_id=xxx    ██
     ██   4. Đổi make_qr_base64() để encode URL thay vì text      ██
     ██                                                           ██
