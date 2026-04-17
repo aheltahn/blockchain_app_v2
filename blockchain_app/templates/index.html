@@ -29,7 +29,6 @@
         <a href="{{ url_for('login') }}" class="btn btn-dark w-100">
           <i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập Producer
         </a>
-        <p class="text-muted small mt-2 mb-0">Tài khoản: <code>producer_01</code> / <code>prod123</code></p>
       </div>
     </div>
   </div>
@@ -47,9 +46,7 @@
           <li><i class="bi bi-check-circle-fill text-success me-2"></i>Tra cứu bằng Product ID</li>
           <li><i class="bi bi-check-circle-fill text-success me-2"></i>Xem timeline hành trình</li>
           <li>
-            <!-- ░░░ QR SCAN TODO ░░░ -->
-            <i class="bi bi-clock text-warning me-2"></i>
-            <span class="text-warning fw-semibold">Quét QR — sẽ bổ sung sau (cần HTTPS)</span>
+            <i class="bi bi-qr-code text-success me-2"></i>Xem QR code sản phẩm
           </li>
         </ul>
       </div>
@@ -57,7 +54,6 @@
         <a href="{{ url_for('login') }}" class="btn w-100" style="background:#2E75B6;color:#fff;">
           <i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập Consumer
         </a>
-        <p class="text-muted small mt-2 mb-0">Tài khoản: <code>consumer</code> / <code>cons123</code></p>
       </div>
     </div>
   </div>
@@ -81,17 +77,9 @@
         <a href="{{ url_for('login') }}" class="btn btn-success w-100">
           <i class="bi bi-box-arrow-in-right me-1"></i>Đăng nhập Admin
         </a>
-        <p class="text-muted small mt-2 mb-0">Tài khoản: <code>admin</code> / <code>admin123</code></p>
       </div>
     </div>
   </div>
 </div>
 
-<!-- QR TODO Notice -->
-<div class="qr-todo mt-4">
-  <i class="bi bi-exclamation-triangle-fill me-2" style="color:#fd7e14;"></i>
-  <strong>TODO — Tính năng Quét QR chưa triển khai:</strong>
-  Cần deploy lên HTTPS (Render.com hoặc ngrok) để trình duyệt cho phép truy cập camera.
-  Sau khi có domain HTTPS, thêm <code>html5-qrcode</code> vào <code>templates/scan.html</code> và đổi QR encode thành URL đầy đủ.
-</div>
 {% endblock %}
