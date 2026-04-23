@@ -81,25 +81,72 @@ class Blockchain:
             print(f"❌ Lỗi kết nối MongoDB: {e}")
             raise
 
+    # def _write_to_google_sheet(self, block):
+    #     try:
+    #         print("📝 Đang ghi vào Google Sheet...")
+    #         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+    #                  "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+            
+    #         creds_path = os.path.join(os.path.dirname(__file__), 'credentials.json')
+    #         creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+            
+    #         client = gspread.authorize(creds)
+    #         sheet = client.open("Blockchain Log").sheet1
+
+    #         # Chuẩn bị dữ liệu để ghi
+    #         # Chuyển đổi dữ liệu data của block thành chuỗi JSON để dễ đọc trong sheet
+    #         data_str = json.dumps(block.data, ensure_ascii=False)
+            
+    #         row = [block.index, block.timestamp, data_str, block.previous_hash, block.hash, block.nonce]
+    #         sheet.append_row(row)
+    #         print("✅ Ghi vào Google Sheet thành công.")
+    #     except Exception as e:
+    #         print(f"❌ Lỗi khi ghi vào Google Sheet: {e}")
     def _write_to_google_sheet(self, block):
         try:
             print("📝 Đang ghi vào Google Sheet...")
-            scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
-                     "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-            
-            creds_path = os.path.join(os.path.dirname(__file__), 'credentials.json')
-            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-            
+
+            scope = [
+                "https://spreadsheets.google.com/feeds",
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive.file",
+                "https://www.googleapis.com/auth/drive"
+            ]
+
+            BASE_DIR = os.path.dirname(__file__)
+            creds_path = os.path.join(BASE_DIR,"credentials.json")
+
+            if os.getenv("GOOGLE_CREDENTIALS"):
+                content = os.getenv("GOOGLE_CREDENTIALS").replace("\\n","\n")
+
+                with open(creds_path,"w") as f:
+                    f.write(content)
+
+                print("✅ credentials file created")
+
+            creds = ServiceAccountCredentials.from_json_keyfile_name(
+                creds_path,
+                scope
+            )
+
             client = gspread.authorize(creds)
             sheet = client.open("Blockchain Log").sheet1
 
-            # Chuẩn bị dữ liệu để ghi
-            # Chuyển đổi dữ liệu data của block thành chuỗi JSON để dễ đọc trong sheet
             data_str = json.dumps(block.data, ensure_ascii=False)
-            
-            row = [block.index, block.timestamp, data_str, block.previous_hash, block.hash, block.nonce]
+
+            row = [
+                block.index,
+                block.timestamp,
+                data_str,
+                block.previous_hash,
+                block.hash,
+                block.nonce
+            ]
+
             sheet.append_row(row)
+
             print("✅ Ghi vào Google Sheet thành công.")
+
         except Exception as e:
             print(f"❌ Lỗi khi ghi vào Google Sheet: {e}")
 
