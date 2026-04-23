@@ -117,7 +117,7 @@ class Blockchain:
             creds_path = os.path.join(BASE_DIR,"credentials.json")
 
             if os.getenv("GOOGLE_CREDENTIALS"):
-                content = os.getenv("GOOGLE_CREDENTIALS").replace("\\n","\n")
+                content = os.getenv("GOOGLE_CREDENTIALS")
 
                 with open(creds_path,"w") as f:
                     f.write(content)
