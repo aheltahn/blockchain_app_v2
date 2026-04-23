@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from blockchain import Blockchain
+from .blockchain import Blockchain
 import qrcode
 import io
 import base64
