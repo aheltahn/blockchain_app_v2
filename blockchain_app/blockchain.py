@@ -14,15 +14,17 @@ DB_NAME = "blockchain_db"
 COLLECTION_NAME = "chain"
 # -------------------------
 
-
 class Block:
-    def __init__(self, index, timestamp, data, previous_hash, nonce=0):
-        self.index         = index
-        self.timestamp     = timestamp
-        self.data          = data  # Dữ liệu linh động, chứa mọi thứ
-        self.nonce         = nonce
+    def __init__(self, index, timestamp, data, previous_hash, nonce=0, hash_value=None):
+        self.index = index
+        self.timestamp = timestamp
+        self.data = data
+        self.nonce = nonce
         self.previous_hash = previous_hash
-        self.hash          = self.calculate_hash()
+
+        # Nếu load từ DB → dùng hash cũ
+        # Nếu tạo block mới → tính hash mới
+        self.hash = hash_value if hash_value else self.calculate_hash()
 
     @property
     def product_id(self):
@@ -151,20 +153,31 @@ class Blockchain:
             print(f"❌ Lỗi khi ghi vào Google Sheet: {e}")
 
     def _load_chain_from_db(self):
-        """Tải toàn bộ chain từ database và sắp xếp theo index."""
+        """Tải toàn bộ chain từ MongoDB."""
         try:
-            chain_data = list(self.collection.find().sort("index", ASCENDING))
-            self.chain = [
-                Block(
+            chain_data = list(
+                self.collection.find().sort("index", ASCENDING)
+            )
+
+            self.chain = []
+
+            for b in chain_data:
+                block = Block(
                     index=b["index"],
                     timestamp=b["timestamp"],
                     data=b["data"],
                     previous_hash=b["previous_hash"],
                     nonce=b.get("nonce", 0),
+
+                    # QUAN TRỌNG:
+                    # lấy hash gốc từ DB
+                    hash_value=b["hash"]
                 )
-                for b in chain_data
-            ]
+
+                self.chain.append(block)
+
             print(f"📚 Đã tải {len(self.chain)} block từ database.")
+
         except Exception as e:
             print(f"❌ Lỗi khi tải chain từ DB: {e}")
             self.chain = []
@@ -263,14 +276,10 @@ class Blockchain:
         """
         if index <= 0:
             raise ValueError("Index không hợp lệ để tamper.")
-
-        if field in ["index", "timestamp", "data", "nonce", "previous_hash"]:
-            result = self.collection.update_one({"index": index}, {"$set": {field: value}})
-            if result.matched_count == 0:
+        result = self.collection.update_one({"index": index}, {"$set": {field: value}})
+        if result.matched_count == 0:
                 raise ValueError(f"Block với index {index} không tồn tại.")
-            self._load_chain_from_db()
-        else:
-            raise ValueError(f"Field '{field}' không tồn tại trong Block.")
+        self._load_chain_from_db()
 
     # ── Reset tamper: load lại từ DB ────────────────────────────
     def reset(self):

@@ -250,6 +250,7 @@ def admin():
 @app.route("/admin/validate")
 @login_required(role="admin")
 def validate():
+    bc.reset()  # Tải lại chain từ DB trước khi kiểm tra
     valid, message = bc.is_valid()
     return jsonify({"valid": valid, "message": message})
 

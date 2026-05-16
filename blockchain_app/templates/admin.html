@@ -47,7 +47,13 @@
   <div class="col-md-4">
     <div class="card text-center py-3">
       <div class="fs-2 fw-bold" style="color:#2E75B6;">
-        {{ blocks | selectattr('product_id', 'ne', 'GENESIS') | map(attribute='product_id') | list | unique | list | length }}
+        {{ blocks
+          | map(attribute='data')
+          | map(attribute='product_id')
+          | reject('equalto', 'GENESIS')
+          | unique
+          | list
+          | length }}
       </div>
       <div class="text-muted small">Sản phẩm trong Chain</div>
     </div>
@@ -68,18 +74,18 @@
   </div>
   <div class="card-body p-3">
     {% for b in blocks %}
-    <div class="card block-card mb-3 {% if '[TAMPERED]' in b.location %}tampered{% endif %}">
+    <div class="card block-card mb-3 {% if '[TAMPERED]' in b.data.location %} tampered{% endif %}">
       <div class="card-body py-3 px-4">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
             <span class="badge me-2" style="background:#1F3864;">Block #{{ b.index }}</span>
-            {% if b.product_id == 'GENESIS' %}
+            {% if b.data.product_id == 'GENESIS' %}
               <span class="badge bg-secondary">GENESIS</span>
             {% else %}
-              <strong class="small">{{ b.product_id }}</strong> —
-              <span class="small text-muted">{{ b.event }}</span>
+              <strong class="small">{{ b.data.product_id }}</strong> —
+              <span class="small text-muted">{{ b.data.event }}</span>
             {% endif %}
-            {% if '[TAMPERED]' in b.location %}
+            {% if '[TAMPERED]' in b.data.location %}
               <span class="badge bg-danger ms-1">⚠ TAMPERED</span>
             {% endif %}
           </div>
@@ -87,11 +93,11 @@
         </div>
 
         <div class="row g-1 small mt-2 text-muted">
-          {% if b.product_id != 'GENESIS' %}
-          <div class="col-md-4"><strong>Địa điểm:</strong> {{ b.location }}</div>
-          <div class="col-md-4"><strong>Actor:</strong> {{ b.actor }}</div>
-          {% if b.quality_note %}
-          <div class="col-md-4"><strong>Chất lượng:</strong> {{ b.quality_note }}</div>
+          {% if b.data.product_id != 'GENESIS' %}
+          <div class="col-md-4"><strong>Địa điểm:</strong> {{ b.data.location }}</div>
+          <div class="col-md-4"><strong>Actor:</strong> {{ b.data.actor }}</div>
+          {% if b.data.quality_note %}
+          <div class="col-md-4"><strong>Chất lượng:</strong> {{ b.data.quality_note }}</div>
           {% endif %}
           {% endif %}
         </div>
